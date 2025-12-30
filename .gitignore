@@ -18,3 +18,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Scripts output
+scripts/*.log
+tfplan

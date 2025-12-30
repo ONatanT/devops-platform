@@ -26,7 +26,7 @@ provider "aws" {
 # Local variables
 locals {
   environment = "staging" # <- Changed
-  aws_region  = "us-west-2" # <- Changed
+  aws_region  = "us-east-1"
 }
 
 # Deploy networking module
@@ -36,14 +36,14 @@ module "networking" {
   environment        = local.environment
   vpc_cidr          = "10.1.0.0/16" # <- Changed (different from dev)
   availability_zones = ["us-east-1a", "us-east-1b"]
-  enable_nat_gateway = false  # <- Changed (staging needs NAT)
+  enable_nat_gateway = true  # <- Changed (staging needs NAT)
 }
 
 # Variables
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = local.aws_region
+  default     = "us-east-1"
 }
 
 # Outputs
