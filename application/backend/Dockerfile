@@ -10,8 +10,9 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install --production
 
-# Copy application code
+# Copy application code AND database files
 COPY server.js ./
+COPY db/ ./db/
 
 # Expose port
 EXPOSE 3000

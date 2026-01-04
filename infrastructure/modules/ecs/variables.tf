@@ -91,3 +91,9 @@ variable "aws_region" {
   description = "AWS region"
   type        = string
 }
+
+variable "db_secret_arn" {
+  description = "ARN of the database credentials secret"
+  type        = string
+  default     = ""
+}

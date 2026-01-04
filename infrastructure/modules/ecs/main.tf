@@ -53,6 +53,26 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Additional policy for Secrets Manager access
+resource "aws_iam_role_policy" "ecs_secrets_policy" {
+  count = var.db_secret_arn != "" ? 1 : 0
+  name = "${var.environment}-ecs-secrets-policy"
+  role = aws_iam_role.ecs_task_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [var.db_secret_arn]
+      }
+    ]
+  })
+}
+
 # IAM Role for ECS Task (the actual container's permissions)
 resource "aws_iam_role" "ecs_task_role" {
   name = "${var.environment}-ecs-task-role"
@@ -117,46 +137,70 @@ resource "aws_ecs_task_definition" "app" {
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   container_definitions = jsonencode([
-    {
-      name  = var.app_name
-      image = "${var.ecr_repository_url}:${var.image_tag}"
+  {
+    name  = var.app_name
+    image = "${var.ecr_repository_url}:${var.image_tag}"
 
-      portMappings = [
-        {
-          containerPort = var.container_port
-          protocol      = "tcp"
-        }
-      ]
-
-      environment = [
-        {
-          name  = "ENVIRONMENT"
-          value = var.environment
-        },
-        {
-          name  = "PORT"
-          value = tostring(var.container_port)
-        }
-      ]
-
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.app.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "ecs"
-        }
+    portMappings = [
+      {
+        containerPort = var.container_port
+        protocol      = "tcp"
       }
+    ]
 
-      healthCheck = {
-        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${var.container_port}/health || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 60
+    environment = [
+      {
+        name  = "ENVIRONMENT"
+        value = var.environment
+      },
+      {
+        name  = "PORT"
+        value = tostring(var.container_port)
+      }
+    ]
+
+    # Database secrets from Secrets Manager
+    secrets = var.db_secret_arn != "" ? [
+      {
+        name      = "DB_HOST"
+        valueFrom = "${var.db_secret_arn}:host::"
+      },
+      {
+        name      = "DB_PORT"
+        valueFrom = "${var.db_secret_arn}:port::"
+      },
+      {
+        name      = "DB_NAME"
+        valueFrom = "${var.db_secret_arn}:dbname::"
+      },
+      {
+        name      = "DB_USER"
+        valueFrom = "${var.db_secret_arn}:username::"
+      },
+      {
+        name      = "DB_PASSWORD"
+        valueFrom = "${var.db_secret_arn}:password::"
+      }
+    ] : []
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.app.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "ecs"
       }
     }
-  ])
+
+    healthCheck = {
+      command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${var.container_port}/health || exit 1"]
+      interval    = 30
+      timeout     = 5
+      retries     = 3
+      startPeriod = 60
+    }
+  }
+])
 
   tags = {
     Name        = "${var.environment}-${var.app_name}-task"

@@ -49,24 +49,24 @@ resource "aws_subnet" "private" {
   }
 }
 
-# NAT Gateway - Allows private subnets to access internet (for updates)
+# NAT Gateway - Only create one instead of one per AZ
 resource "aws_eip" "nat" {
-  count  = var.enable_nat_gateway ? length(var.availability_zones) : 0
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
 
   tags = {
-    Name        = "${var.environment}-nat-eip-${count.index + 1}"
+    Name        = "${var.environment}-nat-eip"
     Environment = var.environment
   }
 }
 
 resource "aws_nat_gateway" "main" {
-  count         = var.enable_nat_gateway ? length(var.availability_zones) : 0
-  allocation_id = aws_eip.nat[count.index].id
-  subnet_id     = aws_subnet.public[count.index].id
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public[0].id
 
   tags = {
-    Name        = "${var.environment}-nat-${count.index + 1}"
+    Name        = "${var.environment}-nat"
     Environment = var.environment
   }
 
@@ -105,7 +105,7 @@ resource "aws_route_table" "private" {
     for_each = var.enable_nat_gateway ? [1] : []
     content {
       cidr_block     = "0.0.0.0/0"
-      nat_gateway_id = aws_nat_gateway.main[count.index].id
+      nat_gateway_id = aws_nat_gateway.main[0].id
     }
   }
 
